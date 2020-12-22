@@ -84,8 +84,15 @@ function Compile-AppInBcContainer {
         [Parameter(Mandatory=$false)]
         [ValidateSet('ExcludeGeneratedTranslations','GenerateCaptions','GenerateLockedTranslations','NoImplicitWith','TranslationFile')]
         [string[]] $features,
-        [scriptblock] $outputTo = { Param($line) Write-Host $line }
+        [scriptblock] $outputTo = { Param($line) Write-Host $line },
+
+
+        [string] $aadTenantId = '',
+        [string] $environment = '',
+        [string] $accessToken = ''
     )
+
+    $usingOnlineSandbox = $false
 
     $startTime = [DateTime]::Now
 
@@ -120,7 +127,6 @@ function Compile-AppInBcContainer {
                 if (Test-Path $mockAssembliesPath -PathType Container) {
                     $assemblyProbingPaths += ",""$mockAssembliesPath"""
                 }
-
 
                 $assemblyProbingPaths
             } -ArgumentList $containerProjectFolder
@@ -213,75 +219,87 @@ function Compile-AppInBcContainer {
             Get-ChildItem -Path (Join-Path $appSymbolsFolder '*.app') | ForEach-Object { Get-NavAppInfo -Path $_.FullName }
         } -ArgumentList $containerSymbolsFolder
     }
-    $publishedApps = Invoke-ScriptInBcContainer -containerName $containerName -ScriptBlock { Param($tenant)
-        Get-NavAppInfo -ServerInstance $ServerInstance -tenant $tenant
-        Get-NavAppInfo -ServerInstance $ServerInstance -symbolsOnly
-    } -ArgumentList $tenant | Where-Object { $_ -isnot [System.String] }
-
-    $applicationApp = $publishedApps | Where-Object { $_.publisher -eq "Microsoft" -and $_.name -eq "Application" }
-    if (-not $applicationApp) {
-        # locate application version number in database if using SQLEXPRESS
-        try {
-            if (($customConfig.DatabaseServer -eq "localhost") -and ($customConfig.DatabaseInstance -eq "SQLEXPRESS")) {
-                $appVersion = Invoke-ScriptInBcContainer -containerName $containerName -scriptblock { Param($databaseName)
-                    (invoke-sqlcmd -ServerInstance 'localhost\SQLEXPRESS' -ErrorAction Stop -Query "SELECT [applicationversion] FROM [$databaseName].[dbo].[`$ndo`$dbproperty]").applicationVersion
-                } -argumentList $customConfig.DatabaseName
-                $publishedApps += @{ "Name" = "Application"; "Publisher" = "Microsoft"; "Version" = $appversion }
-            }
-        }
-        catch {
-            # ignore errors - use version number in app.json
-        }
-    }
-
-    $serverInstance = $customConfig.ServerInstance
-    if ($customConfig.DeveloperServicesSSLEnabled -eq "true") {
-        $protocol = "https://"
-    }
-    else {
-        $protocol = "http://"
-    }
-
-    $ip = Get-BcContainerIpAddress -containerName $containerName
-    if ($ip) {
-        $devServerUrl = "$($protocol)$($ip):$($customConfig.DeveloperServicesPort)/$ServerInstance"
-    }
-    else {
-        $devServerUrl = "$($protocol)$($containerName):$($customConfig.DeveloperServicesPort)/$ServerInstance"
-    }
-
-    $sslVerificationDisabled = ($protocol -eq "https://")
-    if ($sslVerificationDisabled) {
-        if (-not ([System.Management.Automation.PSTypeName]"SslVerification").Type)
-        {
-            Add-Type -TypeDefinition "
-                using System.Net.Security;
-                using System.Security.Cryptography.X509Certificates;
-                public static class SslVerification
-                {
-                    private static bool ValidationCallback(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors) { return true; }
-                    public static void Disable() { System.Net.ServicePointManager.ServerCertificateValidationCallback = ValidationCallback; }
-                    public static void Enable()  { System.Net.ServicePointManager.ServerCertificateValidationCallback = null; }
-                }"
-        }
-        Write-Host "Disabling SSL Verification"
-        [SslVerification]::Disable()
-    }
 
     $webClient = [TimeoutWebClient]::new(300000)
-    if ($customConfig.ClientServicesCredentialType -eq "Windows") {
-        $webClient.UseDefaultCredentials = $true
+    $publishedApps = @()
+
+    if (!$usingOnlineSandbox) {
+        $publishedApps = Invoke-ScriptInBcContainer -containerName $containerName -ScriptBlock { Param($tenant)
+            Get-NavAppInfo -ServerInstance $ServerInstance -tenant $tenant
+            Get-NavAppInfo -ServerInstance $ServerInstance -symbolsOnly
+        } -ArgumentList $tenant | Where-Object { $_ -isnot [System.String] }
+    
+        $applicationApp = $publishedApps | Where-Object { $_.publisher -eq "Microsoft" -and $_.name -eq "Application" }
+        if (-not $applicationApp) {
+            # locate application version number in database if using SQLEXPRESS
+            try {
+                if (($customConfig.DatabaseServer -eq "localhost") -and ($customConfig.DatabaseInstance -eq "SQLEXPRESS")) {
+                    $appVersion = Invoke-ScriptInBcContainer -containerName $containerName -scriptblock { Param($databaseName)
+                        (invoke-sqlcmd -ServerInstance 'localhost\SQLEXPRESS' -ErrorAction Stop -Query "SELECT [applicationversion] FROM [$databaseName].[dbo].[`$ndo`$dbproperty]").applicationVersion
+                    } -argumentList $customConfig.DatabaseName
+                    $publishedApps += @{ "Name" = "Application"; "Publisher" = "Microsoft"; "Version" = $appversion }
+                }
+            }
+            catch {
+                # ignore errors - use version number in app.json
+            }
+        }
+
+        $serverInstance = $customConfig.ServerInstance
+        if ($customConfig.DeveloperServicesSSLEnabled -eq "true") {
+            $protocol = "https://"
+        }
+        else {
+            $protocol = "http://"
+        }
+
+        $ip = Get-BcContainerIpAddress -containerName $containerName
+        if ($ip) {
+            $devServerUrl = "$($protocol)$($ip):$($customConfig.DeveloperServicesPort)/$ServerInstance"
+        }
+        else {
+            $devServerUrl = "$($protocol)$($containerName):$($customConfig.DeveloperServicesPort)/$ServerInstance"
+        }
+
+        $sslVerificationDisabled = ($protocol -eq "https://")
+        if ($sslVerificationDisabled) {
+            if (-not ([System.Management.Automation.PSTypeName]"SslVerification").Type)
+            {
+                Add-Type -TypeDefinition "
+                    using System.Net.Security;
+                    using System.Security.Cryptography.X509Certificates;
+                    public static class SslVerification
+                    {
+                        private static bool ValidationCallback(object sender, X509Certificate certificate, X509Chain chain, SslPolicyErrors sslPolicyErrors) { return true; }
+                        public static void Disable() { System.Net.ServicePointManager.ServerCertificateValidationCallback = ValidationCallback; }
+                        public static void Enable()  { System.Net.ServicePointManager.ServerCertificateValidationCallback = null; }
+                    }"
+            }
+            Write-Host "Disabling SSL Verification"
+            [SslVerification]::Disable()
+        }
+
+        if ($customConfig.ClientServicesCredentialType -eq "Windows") {
+            $webClient.UseDefaultCredentials = $true
+        }
+        else {
+            if (!($credential)) {
+                throw "You need to specify credentials when you are not using Windows Authentication"
+            }
+            
+            $pair = ("$($Credential.UserName):"+[System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($credential.Password)))
+            $bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
+            $base64 = [System.Convert]::ToBase64String($bytes)
+            $basicAuthValue = "Basic $base64"
+            $webClient.Headers.Add("Authorization", $basicAuthValue)
+        }
     }
     else {
-        if (!($credential)) {
-            throw "You need to specify credentials when you are not using Windows Authentication"
-        }
-        
-        $pair = ("$($Credential.UserName):"+[System.Runtime.InteropServices.Marshal]::PtrToStringAuto([System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($credential.Password)))
-        $bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
-        $base64 = [System.Convert]::ToBase64String($bytes)
-        $basicAuthValue = "Basic $base64"
-        $webClient.Headers.Add("Authorization", $basicAuthValue)
+        $sslverificationdisabled = $false
+        $bearerAuthValue = "Bearer $accessToken"
+        $webclient = [System.Net.WebClient]::new()
+        $webClient.Headers.Add("Authorization", $bearerAuthValue)
+        $devServerUrl = "https://api.businesscentral.dynamics.com/v2.0/$environment"
     }
 
     $depidx = 0
@@ -363,7 +381,7 @@ function Compile-AppInBcContainer {
         $depidx++
     }
  
-    if ($sslverificationdisabled) {
+    if ($sslverificationdisabled -and !$usingOnlineSandbox) {
         Write-Host "Re-enabling SSL Verification"
         [SslVerification]::Enable()
     }

@@ -15,14 +15,16 @@ Function Get-BcContainerServerConfiguration {
 
     $ResultObjectArray = @()
     $config = Invoke-ScriptInBcContainer -containerName $containerName -ScriptBlock{
-        Get-NAVServerConfiguration -ServerInstance $ServerInstance -AsXml
+        $customConfigFile = (Get-Item "c:\program files\Microsoft Dynamics NAV\*\Service\CustomSettings.config").FullName
+        $customConfig = [xml](Get-Content $customConfigFile)
+        $customConfig
     }
     
     $Object = New-Object -TypeName PSObject -Property @{
         ContainerName = $ContainerName
     }
 
-    $Config.configuration.appSettings.add | ForEach-Object{
+    $Config.appSettings.add | ForEach-Object{
         $Object | Add-Member -MemberType NoteProperty -Name $_.Key -Value $_.Value
     }
 
