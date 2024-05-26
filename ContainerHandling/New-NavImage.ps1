@@ -708,7 +708,7 @@ LABEL legal="http://go.microsoft.com/fwlink/?LinkId=837447" \
                     Write-Host "$populateBuildFolder populated, skipping build of image"
                 }
                 else {
-                    if (!(DockerDo -command build -parameters @("--isolation=$isolation", "--memory $memory", "--no-cache", "--tag $imageName") -imageName $buildFolder)) {
+                    if (!(DockerDo -command "buildx build" -parameters @("--load", "--isolation=$isolation", "--memory $memory", "--no-cache", "--tag $imageName") -imageName $buildFolder)) {
                         throw "Docker Build didn't indicate success"
                     }
     
