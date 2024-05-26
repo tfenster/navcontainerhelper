@@ -702,7 +702,7 @@ LABEL legal="http://go.microsoft.com/fwlink/?LinkId=837447" \
       $($skipDatabaseLabel)$($multitenantLabel)$($additionalLabelsStr)country="$($appManifest.Country)" \
       version="$($appmanifest.Version)" \
       platform="$($appManifest.Platform)"
-"@ | Set-Content (Join-Path $buildFolder "DOCKERFILE")
+"@ | Set-Content (Join-Path $buildFolder "Dockerfile")
 
                 if ($populateBuildFolder) {
                     Write-Host "$populateBuildFolder populated, skipping build of image"
