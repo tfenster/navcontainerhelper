@@ -719,7 +719,7 @@ LABEL legal="http://go.microsoft.com/fwlink/?LinkId=837447" \
             }
             finally {
                 if ($populateBuildFolder -eq "") {
-                    Remove-Item $buildFolder -Recurse -Force -ErrorAction SilentlyContinue
+                    # Remove-Item $buildFolder -Recurse -Force -ErrorAction SilentlyContinue
                 }
             }
         }
