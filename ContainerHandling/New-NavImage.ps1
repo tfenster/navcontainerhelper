@@ -685,6 +685,7 @@ try {
                 }
 @"
 FROM $baseimage
+SHELL ["C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell", "-Command", "$ErrorActionPreference = 'Stop'; $ProgressPreference = 'SilentlyContinue';"]
 
 ENV DatabaseServer=localhost DatabaseInstance=SQLEXPRESS DatabaseName=CRONUS IsBcSandbox=$isBcSandbox artifactUrl=$artifactUrl filesOnly=$filesOnly
 
