@@ -593,8 +593,7 @@ try {
                         $databasePath = $databaseBackupPath
                     }
                     Write-Host "Copying Database"
-                    Copy-Item -path $databasePath -Destination $dbPath -Force
-                    
+                        Copy-Item -path $databasePath -Destination $dbPath -Force
                     if ($licenseFilePath) {
                         Write-Host "Copying Licensefile"
                         Copy-Item -path $licenseFilePath -Destination "$dbPath\CRONUS.flf" -Force
