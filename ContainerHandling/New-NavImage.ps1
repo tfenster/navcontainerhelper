@@ -697,7 +697,6 @@ ENV DatabaseServer=localhost DatabaseInstance=SQLEXPRESS DatabaseName=CRONUS IsB
 
 COPY my /run/
 COPY NAVDVD /NAVDVD/
-COPY ./navinstall.ps1 /run/240
 $DockerFileAddFonts
 $InstallDotNet
 
