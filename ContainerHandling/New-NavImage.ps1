@@ -706,6 +706,8 @@ LABEL legal="http://go.microsoft.com/fwlink/?LinkId=837447" \
       platform="$($appManifest.Platform)"
 "@ | Set-Content (Join-Path $buildFolder "Dockerfile")
 
+Copy-item navinstall.ps1 $buildFolder
+
                 if ($populateBuildFolder) {
                     Write-Host "$populateBuildFolder populated, skipping build of image"
                 }
