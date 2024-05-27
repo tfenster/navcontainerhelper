@@ -710,6 +710,8 @@ LABEL legal="http://go.microsoft.com/fwlink/?LinkId=837447" \
       $($skipDatabaseLabel)$($multitenantLabel)$($additionalLabelsStr)country="$($appManifest.Country)" \
       version="$($appmanifest.Version)" \
       platform="$($appManifest.Platform)"
+
+CMD .\Run\start.ps1
 "@ | Set-Content (Join-Path $buildFolder "Dockerfile")
 
 Copy-item navinstall.ps1 $buildFolder
